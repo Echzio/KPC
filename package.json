@@ -1,0 +1,36 @@
+{
+  "name": "keenetic-policy-changer",
+  "version": "1.0.0",
+  "description": "Инструмент для управления политиками доступа на Keenetic роутере через SSH",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "list-devices": "tsx src/index.ts list-devices",
+    "list-policies": "tsx src/index.ts list-policies",
+    "change-policy": "tsx src/index.ts change-policy",
+    "reset-policy": "tsx src/index.ts reset-policy",
+    "full-information": "tsx src/index.ts interactive",
+    "typecheck": "yarn tsc --noEmit"
+  },
+  "keywords": [
+    "keenetic",
+    "router",
+    "policy",
+    "ssh",
+    "network",
+    "typescript"
+  ],
+  "type": "module",
+  "dependencies": {
+    "commander": "14.0.2",
+    "dotenv": "17.2.3",
+    "ssh2": "1.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "25.0.8",
+    "@types/ssh2": "1.15.5",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  },
+  "packageManager": "yarn@4.12.0"
+}
