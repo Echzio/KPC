@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import "dotenv/config";
 import { Command } from "commander";
 
@@ -12,7 +10,7 @@ const program = new Command();
 program
   .name("keenetic-policy-changer")
   .description(
-    "Инструмент для управления политиками доступа на Keenetic роутере"
+    "Инструмент для управления политиками доступа на Keenetic роутере",
   )
   .version("1.0.0");
 

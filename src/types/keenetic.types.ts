@@ -17,9 +17,9 @@ export interface Device {
  */
 export interface Policy {
   /** Идентификатор политики */
-  name?: string;
+  name: string;
   /** Описание политики */
-  description?: string;
+  description: string;
 }
 
 /**

@@ -1,26 +1,41 @@
 import { KeeneticSSHClient } from "./ssh-client";
 import { Device, Policy } from "./types";
 
+const MAC_REGEX = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
+const POLICY_REGEX = /^[a-zA-Z0-9_-]+$/;
+
 export class KeeneticManager {
-  private ssh: KeeneticSSHClient;
+  #ssh: KeeneticSSHClient;
 
   constructor(sshClient: KeeneticSSHClient) {
-    this.ssh = sshClient;
+    this.#ssh = sshClient;
+  }
+
+  #validateMacAddress(mac: string): void {
+    if (!MAC_REGEX.test(mac)) {
+      throw new Error(`Невалидный MAC-адрес: ${mac}`);
+    }
+  }
+
+  #validatePolicyId(policyId: string): void {
+    if (!POLICY_REGEX.test(policyId)) {
+      throw new Error(`Невалидный ID политики: ${policyId}`);
+    }
   }
 
   async getDevices(): Promise<Device[]> {
     try {
-      const output = await this.ssh.executeCommand("show ip hotspot");
+      const output = await this.#ssh.executeCommand("show ip hotspot");
 
-      return this.parseDevices(output);
+      return this.#parseDevices(output);
     } catch (error) {
       throw new Error(
-        `Ошибка получения списка устройств: ${(error as Error).message}`
+        `Ошибка получения списка устройств: ${(error as Error).message}`,
       );
     }
   }
 
-  private parseDevices(output: string): Device[] {
+  #parseDevices(output: string): Device[] {
     try {
       const devices: Device[] = [];
       const lines = output.split("\n");
@@ -31,7 +46,7 @@ export class KeeneticManager {
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        const trimmed = line.trim();
+        const trimmed = line?.trim();
 
         // Начало нового устройства
         if (trimmed === "host:") {
@@ -64,10 +79,10 @@ export class KeeneticManager {
         if (
           inInterfaceBlock &&
           (trimmed === "" ||
-            (line.match(/^\s{0,10}\w+:/) &&
-              !trimmed.startsWith("id:") &&
-              !trimmed.startsWith("name:") &&
-              !trimmed.startsWith("description:")))
+            (line?.match(/^\s{0,10}\w+:/) &&
+              !trimmed?.startsWith("id:") &&
+              !trimmed?.startsWith("name:") &&
+              !trimmed?.startsWith("description:")))
         ) {
           inInterfaceBlock = false;
           if (interfaceId) {
@@ -76,13 +91,13 @@ export class KeeneticManager {
         }
 
         // Парсим поля
-        const match = trimmed.match(/^(\w+):\s*(.*)$/);
+        const match = trimmed?.match(/^(\w+):\s*(.*)$/);
         if (match) {
           const [, key, value] = match;
 
           if (inInterfaceBlock) {
             if (key === "id") {
-              interfaceId = value;
+              interfaceId = value || "";
               currentDevice.interface = value;
             }
           } else {
@@ -119,20 +134,20 @@ export class KeeneticManager {
       return devices;
     } catch (error) {
       throw new Error(
-        `Ошибка парсинга данных устройств: ${(error as Error).message}`
+        `Ошибка парсинга данных устройств: ${(error as Error).message}`,
       );
     }
   }
 
   async getPolicies(): Promise<Policy[]> {
     try {
-      const output = await this.ssh.executeCommand("show ip policy");
+      const output = await this.#ssh.executeCommand("show ip policy");
 
       const formattedPolicies = output
         .split("policy")
         .slice(1)
         .map((item) => {
-          const informString = item.split("\n")[0];
+          const informString = item.split("\n")[0] || "";
           const name = informString
             .match(/name = .+, /i)?.[0]
             ?.replace(/name = (.+), /, `$1`);
@@ -140,30 +155,36 @@ export class KeeneticManager {
             .match(/description = .+:/i)?.[0]
             ?.replace(/description = (.+):/, `$1`);
 
-          return { name, description };
+          return {
+            name: name || "Unknown",
+            description: description || "",
+          };
         });
 
-      return formattedPolicies ?? [];
+      return formattedPolicies;
     } catch (error) {
       throw new Error(
-        `Ошибка получения списка политик: ${(error as Error).message}`
+        `Ошибка получения списка политик: ${(error as Error).message}`,
       );
     }
   }
 
   async changeDevicePolicy(
     macAddress: string,
-    policyId: string
+    policyId: string,
   ): Promise<boolean> {
+    this.#validateMacAddress(macAddress);
+    this.#validatePolicyId(policyId);
+
     try {
       const command = `ip hotspot host ${macAddress} policy ${policyId}`;
-      await this.ssh.executeCommand(command);
+      await this.#ssh.executeCommand(command);
 
       // Сохраняем конфигурацию
-      await this.ssh.executeCommand("system configuration save");
+      await this.#ssh.executeCommand("system configuration save");
 
       console.log(
-        `Устройство ${macAddress} успешно перемещено в политику ${policyId}`
+        `Устройство ${macAddress} успешно перемещено в политику ${policyId}`,
       );
       return true;
     } catch (error) {
@@ -172,12 +193,14 @@ export class KeeneticManager {
   }
 
   async resetDevicePolicy(macAddress: string): Promise<boolean> {
+    this.#validateMacAddress(macAddress);
+
     try {
       const command = `ip hotspot host ${macAddress} no policy`;
-      await this.ssh.executeCommand(command);
+      await this.#ssh.executeCommand(command);
 
       // Сохраняем конфигурацию
-      await this.ssh.executeCommand("system configuration save");
+      await this.#ssh.executeCommand("system configuration save");
 
       console.log(`Устройство ${macAddress} возвращено в дефолтную политику`);
       return true;

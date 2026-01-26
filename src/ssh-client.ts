@@ -2,34 +2,37 @@ import { Client, ConnectConfig, ClientChannel } from "ssh2";
 import { SSHConfig } from "./types";
 
 export class KeeneticSSHClient {
-  private config: ConnectConfig;
-  private connection: Client | null;
+  #config: ConnectConfig;
+  #connection: Client | null;
 
   constructor(config: SSHConfig) {
-    this.config = {
+    this.#config = {
       host: config.host,
       port: config.port || 22,
       username: config.username,
       password: config.password,
+      readyTimeout: 10_000, // 10 секунд таймаут подключения
     };
-    this.connection = null;
+    this.#connection = null;
   }
 
   connect(): Promise<void> {
     const { promise, resolve, reject } = Promise.withResolvers<void>();
 
-    this.connection = new Client();
+    this.#connection = new Client();
 
-    this.connection
+    this.#connection
       .on("ready", () => {
         console.log("SSH подключение установлено");
         resolve();
       })
       .on("error", (err: Error) => {
+        this.#connection?.end();
+        this.#connection = null;
         console.error("Ошибка SSH подключения:", err.message);
         reject(err);
       })
-      .connect(this.config);
+      .connect(this.#config);
 
     return promise;
   }
@@ -37,12 +40,12 @@ export class KeeneticSSHClient {
   executeCommand(command: string): Promise<string> {
     const { promise, resolve, reject } = Promise.withResolvers<string>();
 
-    if (!this.connection) {
+    if (!this.#connection) {
       reject(new Error("SSH подключение не установлено"));
       return promise;
     }
 
-    this.connection.exec(
+    this.#connection.exec(
       command,
       (err: Error | undefined, stream: ClientChannel) => {
         if (err) {
@@ -57,7 +60,7 @@ export class KeeneticSSHClient {
           .on("close", (code: number) => {
             if (code !== 0) {
               reject(
-                new Error(`Команда завершилась с кодом ${code}: ${stderr}`)
+                new Error(`Команда завершилась с кодом ${code}: ${stderr}`),
               );
             } else {
               resolve(stdout);
@@ -69,15 +72,15 @@ export class KeeneticSSHClient {
           .stderr.on("data", (data: Buffer) => {
             stderr += data.toString();
           });
-      }
+      },
     );
 
     return promise;
   }
 
   disconnect(): void {
-    if (this.connection) {
-      this.connection.end();
+    if (this.#connection) {
+      this.#connection.end();
       console.log("SSH подключение закрыто");
     }
   }
@@ -93,10 +96,10 @@ export function createSSHClient(): KeeneticSSHClient {
 
   if (!config.host || !config.username || !config.password) {
     console.error(
-      "Ошибка: Не указаны необходимые параметры подключения в .env файле"
+      "Ошибка: Не указаны необходимые параметры подключения в .env файле",
     );
     console.error(
-      "Убедитесь, что заполнены: ROUTER_HOST, ROUTER_USERNAME, ROUTER_PASSWORD"
+      "Убедитесь, что заполнены: ROUTER_HOST, ROUTER_USERNAME, ROUTER_PASSWORD",
     );
     process.exit(1);
   }
